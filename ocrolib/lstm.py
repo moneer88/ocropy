@@ -33,12 +33,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import measurements,filters
 
-import common as ocrolib
+import ocrolib.common as ocrolib
 from ocrolib.exceptions import RecognitionError
 from ocrolib.edist import levenshtein
-import utils
+import ocrolib.utils
 
 initial_range = 0.1
+import sys
+if sys.version_info[0] >= 3:
+    unicode = str
+    unichr = chr
 
 class RangeError(Exception):
     def __init__(self,s=None):

@@ -5,7 +5,7 @@ import linecache
 import os
 import sys
 import warnings
-from types import NoneType
+#from types import NoneType
 # FIXME from ... import wrap
 
 import numpy as np
@@ -200,10 +200,12 @@ def checks(*types,**ktypes):
         def argument_checks(*args,**kw):
             # print("@@@", f, "decl", types, ktypes, "call",
             #       [strc(x) for x in args], kw)
-            name = f.func_name
-            argnames = f.func_code.co_varnames[:f.func_code.co_argcount]
+            name = f.__name__
+            argnames = f.__code__.co_varnames[:f.__code__.co_argcount]
             kw3 = [(var,value,ktypes.get(var,True)) for var,value in kw.items()]
-            for var,value,type_ in zip(argnames,args,types)+kw3:
+            #print('kw3', kw3)
+            #print('zip(argnames,args,types)', zip(argnames,args,types))
+            for var,value,type_ in zip(argnames,args,types):#+kw3
                 try:
                     checktype(value,type_)
                 except AssertionError as e:

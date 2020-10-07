@@ -13,7 +13,7 @@ import sysconfig
 import unicodedata
 import inspect
 import glob
-import cPickle
+import pickle
 from ocrolib.exceptions import (BadClassLabel, BadInput, FileNotFound,
                                 OcropusException)
 
@@ -25,20 +25,23 @@ from pylab import (clf, cm, ginput, gray, imshow, ion, subplot, where)
 from scipy.ndimage import morphology, measurements
 import PIL
 
-from default import getlocal
-from toplevel import (checks, ABINARY2, AINT2, AINT3, BOOL, DARKSEG, GRAYSCALE,
+from ocrolib.default import getlocal
+from ocrolib.toplevel import (checks, ABINARY2, AINT2, AINT3, BOOL, DARKSEG, GRAYSCALE,
                       LIGHTSEG, LINESEG, PAGESEG)
-import chars
+import ocrolib.chars
 import codecs
-import ligatures
-import lstm
-import morph
+import ocrolib.ligatures as ligatures
+import ocrolib.lstm
+import ocrolib.morph as morph
 import multiprocessing
-import sl
+import ocrolib.sl
 
 pickle_mode = 2
 
-
+import sys
+if sys.version_info[0] >= 3:
+    unicode = str
+    unichr = chr
 ################################################################
 # text normalization
 ################################################################
@@ -49,10 +52,10 @@ def normalize_text(s):
     characters."""
     s = unicode(s)
     s = unicodedata.normalize('NFC',s)
-    s = re.sub(ur'\s+(?u)',' ',s)
-    s = re.sub(ur'\n(?u)','',s)
-    s = re.sub(ur'^\s+(?u)','',s)
-    s = re.sub(ur'\s+$(?u)','',s)
+    # s = re.sub(ur'\s+(?u)',' ',s)
+    # s = re.sub(ur'\n(?u)','',s)
+    # s = re.sub(ur'^\s+(?u)','',s)
+    # s = re.sub(ur'\s+$(?u)','',s)
     for m,r in chars.replacements:
         s = re.sub(unicode(m),unicode(r),s)
     return s
@@ -61,24 +64,24 @@ def project_text(s,kind="exact"):
     """Project text onto a smaller subset of characters
     for comparison."""
     s = normalize_text(s)
-    s = re.sub(ur'( *[.] *){4,}',u'....',s) # dot rows
-    s = re.sub(ur'[~_]',u'',s) # dot rows
-    if kind=="exact":
-        return s
-    if kind=="nospace":
-        return re.sub(ur'\s','',s)
-    if kind=="spletdig":
-        return re.sub(ur'[^A-Za-z0-9 ]','',s)
-    if kind=="letdig":
-        return re.sub(ur'[^A-Za-z0-9]','',s)
-    if kind=="letters":
-        return re.sub(ur'[^A-Za-z]','',s)
-    if kind=="digits":
-        return re.sub(ur'[^0-9]','',s)
-    if kind=="lnc":
-        s = s.upper()
-        return re.sub(ur'[^A-Z]','',s)
-    raise BadInput("unknown normalization: "+kind)
+    # s = re.sub(ur'( *[.] *){4,}',u'....',s) # dot rows
+    # s = re.sub(ur'[~_]',u'',s) # dot rows
+    # if kind=="exact":
+    #     return s
+    # if kind=="nospace":
+    #     return re.sub(ur'\s','',s)
+    # if kind=="spletdig":
+    #     return re.sub(ur'[^A-Za-z0-9 ]','',s)
+    # if kind=="letdig":
+    #     return re.sub(ur'[^A-Za-z0-9]','',s)
+    # if kind=="letters":
+    #     return re.sub(ur'[^A-Za-z]','',s)
+    # if kind=="digits":
+    #     return re.sub(ur'[^0-9]','',s)
+    # if kind=="lnc":
+    #     s = s.upper()
+    #     return re.sub(ur'[^A-Z]','',s)
+    # raise BadInput("unknown normalization: "+kind)
 
 ################################################################
 ### Text I/O
@@ -198,7 +201,17 @@ def read_image_binary(fname,dtype='i',pageno=0):
     if type(fname)==tuple: fname,pageno = fname
     assert pageno==0
     pil = PIL.Image.open(fname)
+    size = pil.size 
+    if size[0] > size[1]:
+        new_width = 1000
+        new_height = size[1]* (new_width/size[0])
+    else:
+        new_height = 1000
+        new_width = size[0]* (new_height/size[1])
+    
+    pil = pil.resize((int(new_width), int(new_height)))
     a = pil2array(pil)
+    
     if a.ndim==3: a = amax(a,axis=2)
     return array(a>0.5*(amin(a)+amax(a)),dtype)
 
@@ -415,16 +428,16 @@ def save_object(fname,obj,zip=0):
     if zip>0:
         # with gzip.GzipFile(fname,"wb") as stream:
         with os.popen("gzip -9 > '%s'"%fname,"wb") as stream:
-            cPickle.dump(obj,stream,2)
+            pickle.dump(obj,stream,2)
     else:
         with open(fname,"wb") as stream:
-            cPickle.dump(obj,stream,2)
+            pickle.dump(obj,stream,2)
 
 def unpickle_find_global(mname,cname):
     if mname=="lstm.lstm":
         return getattr(lstm,cname)
     if not mname in sys.modules.keys():
-        exec "import "+mname
+        exec("import "+mname)
     return getattr(sys.modules[mname],cname)
 
 def load_object(fname,zip=0,nofind=0,verbose=0):
@@ -440,12 +453,12 @@ def load_object(fname,zip=0,nofind=0,verbose=0):
     if zip>0:
         # with gzip.GzipFile(fname,"rb") as stream:
         with os.popen("gunzip < '%s'"%fname,"rb") as stream:
-            unpickler = cPickle.Unpickler(stream)
+            unpickler = pickle.Unpickler(stream)
             unpickler.find_global = unpickle_find_global
             return unpickler.load()
     else:
         with open(fname,"rb") as stream:
-            unpickler = cPickle.Unpickler(stream)
+            unpickler = pickle.Unpickler(stream)
             unpickler.find_global = unpickle_find_global
             return unpickler.load()
 

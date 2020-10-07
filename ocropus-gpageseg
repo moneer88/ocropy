@@ -23,13 +23,16 @@ from multiprocessing import Pool
 
 import numpy as np
 from scipy.ndimage import measurements
-from scipy.misc import imsave
+#from scipy.misc import imsave
+import imageio
 from scipy.ndimage.filters import gaussian_filter,uniform_filter,maximum_filter
 
 import ocrolib
 from ocrolib import psegutils,morph,sl
 from ocrolib.exceptions import OcropusException
 from ocrolib.toplevel import *
+from ocrolib.common import *
+import time
 
 parser = argparse.ArgumentParser(add_help=False)
 
@@ -104,7 +107,8 @@ group_others.add_argument("-h", "--help", action="help", help="show this help me
 parser.add_argument('files',nargs='+')
 
 args = parser.parse_args()
-args.files = ocrolib.glob_all(args.files)
+print(args.files)
+#args.files = ocrolib.glob_all(args.files)
 
 def find(condition):
     "Return the indices where ravel(condition) is true"
@@ -162,7 +166,8 @@ def DSAVE(title,image):
         image = np.transpose(np.array(image),[1,2,0])
     fname = "_"+title+".png"
     print_info("debug " + fname)
-    imsave(fname,image.astype('float'))
+    imageio.imwrite(fname, image.astype('float'))
+    #imsave(fname,image.astype('float'))
 
 
 ################################################################
@@ -267,7 +272,7 @@ def compute_colseps(binary,scale):
 
 def apply_mask(binary,colseps):
     try:
-        mask = ocrolib.read_image_binary(base+".mask.png")
+        mask = read_image_binary(base+".mask.png")
     except IOError:
         return binary,colseps
     masked_seps = np.maximum(colseps,mask)
@@ -298,8 +303,8 @@ def compute_gradmaps(binary,scale):
         grad = gaussian_filter(1.0*cleaned,(max(4,args.vscale*0.3*scale),
                                             args.hscale*scale),order=(1,0))
         grad = uniform_filter(grad,(args.vscale,args.hscale*6*scale))
-    bottom = ocrolib.norm_max((grad<0)*(-grad))
-    top = ocrolib.norm_max((grad>0)*grad)
+    bottom = norm_max((grad<0)*(-grad))
+    top = norm_max((grad>0)*grad)
     return bottom,top,boxmap
 
 
@@ -352,18 +357,30 @@ def compute_segmentation(binary,scale):
 
     # start by removing horizontal black lines, which only
     # interfere with the rest of the page segmentation
+    start =time.time()
     binary = remove_hlines(binary,scale)
-
+    end = time.time()
+    print('remove_hlines', end-start)
     # do the column finding
+    start =time.time()
     if not args.quiet: print_info("computing column separators")
     colseps,binary = compute_colseps(binary,scale)
+    end = time.time()
+    print('compute_colseps', end-start)
 
     # now compute the text line seeds
     if not args.quiet: print_info("computing lines")
+    start = time.time()
     bottom,top,boxmap = compute_gradmaps(binary,scale)
+    end =time.time()
+    print('compute_gradmaps', end-start)
+    start = time.time()
     seeds = compute_line_seeds(binary,bottom,top,colseps,scale)
-    DSAVE("seeds",[bottom,top,boxmap])
+    end = time.time()
+    print('compute_line_seeds', end-start)
 
+    DSAVE("seeds",[bottom,top,boxmap])
+    
     # spread the text line seeds to all the remaining
     # components
     if not args.quiet: print_info("propagating labels")
@@ -382,14 +399,15 @@ def compute_segmentation(binary,scale):
 def process1(job):
     fname,i = job
     global base
-    base,_ = ocrolib.allsplitext(fname)
+    base,_ = allsplitext(fname)
     outputdir = base
 
     try:
-        binary = ocrolib.read_image_binary(base+".bin.png")
+        binary = read_image_binary(base+".bin.png")
     except IOError:
         try:
-            binary = ocrolib.read_image_binary(fname)
+            print('****************hello***************')
+            binary = read_image_binary(fname)
         except IOError:
             if ocrolib.trace: traceback.print_exc()
             print_error("cannot open either %s.bin.png or %s" % (base, fname))
@@ -405,7 +423,7 @@ def process1(job):
 
     if args.gray:
         if os.path.exists(base+".nrm.png"):
-            gray = ocrolib.read_image_gray(base+".nrm.png")
+            gray = read_image_gray(base+".nrm.png")
             checktype(gray,GRAYSCALE)
         else:
             print_error("Grayscale version %s.nrm.png not found. Use ocropus-nlbin for creating normalized grayscale version of the pages as well." % base)
@@ -426,9 +444,11 @@ def process1(job):
         return
 
     # find columns and text lines
+    print('************start*********************')
 
     if not args.quiet: print_info("computing segmentation")
     segmentation = compute_segmentation(binary,scale)
+    print('************done*********************')
     if np.amax(segmentation)>args.maxlines:
         print_error("%s: too many lines %g" % (fname, np.amax(segmentation)))
         return
@@ -451,17 +471,19 @@ def process1(job):
     # finally, output everything
 
     if not args.quiet: print_info("writing lines")
+
+    print('outdir', outputdir)
     if not os.path.exists(outputdir):
         os.mkdir(outputdir)
     lines = [lines[i] for i in lsort]
-    ocrolib.write_page_segmentation("%s.pseg.png"%outputdir,segmentation)
-    cleaned = ocrolib.remove_noise(binary,args.noise)
+    write_page_segmentation("%s.pseg.png"%outputdir,segmentation)
+    cleaned = remove_noise(binary,args.noise)
     for i,l in enumerate(lines):
         binline = psegutils.extract_masked(1-cleaned,l,pad=args.pad,expand=args.expand)
-        ocrolib.write_image_binary("%s/01%04x.bin.png"%(outputdir,i+1),binline)
+        write_image_binary("%s/01%04x.bin.png"%(outputdir,i+1),binline)
         if args.gray:
             grayline = psegutils.extract_masked(gray,l,pad=args.pad,expand=args.expand)
-            ocrolib.write_image_gray("%s/01%04x.nrm.png"%(outputdir,i+1),grayline)
+            write_image_gray("%s/01%04x.nrm.png"%(outputdir,i+1),grayline)
     print_info("%6d  %s %4.1f %d" % (i, fname,  scale,  len(lines)))
 
 if len(args.files)==1 and os.path.isdir(args.files[0]):

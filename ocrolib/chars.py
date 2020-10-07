@@ -6,7 +6,7 @@ import re
 
 digits = u"0123456789"
 letters = u"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-symbols = ur"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+symbols = u"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
 ascii = digits+letters+symbols
 
 xsymbols = u"""€¢£»«›‹÷©®†‡°∙•◦‣¶§÷¡¿▪▫"""
@@ -21,6 +21,9 @@ default = ascii+xsymbols+german+french+portuguese
 
 european = default+turkish+greek
 
+import sys
+if sys.version_info[0] >= 3:
+    unicode = str
 # List of regular expressions for normalizing Unicode text.
 # Cleans up common homographs. This is mostly used for
 # training text.
@@ -60,7 +63,7 @@ replacements = [
 
 def requote(s):
     s = unicode(s)
-    s = re.sub(ur"''",u'"',s)
+    s = re.sub(u"''",u'"',s)
     return s
 
 def requote_fancy(s,germanic=0):
@@ -68,20 +71,20 @@ def requote_fancy(s,germanic=0):
     if germanic:
         # germanic quoting style reverses the shapes
         # straight double quotes
-        s = re.sub(ur"\s+''",u"”",s)
+        s = re.sub(u"\s+''",u"”",s)
         s = re.sub(u"''\s+",u"“",s)
-        s = re.sub(ur"\s+,,",u"„",s)
+        s = re.sub(u"\s+,,",u"„",s)
         # straight single quotes
-        s = re.sub(ur"\s+'",u"’",s)
-        s = re.sub(ur"'\s+",u"‘",s)
-        s = re.sub(ur"\s+,",u"‚",s)
+        s = re.sub(u"\s+'",u"’",s)
+        s = re.sub(u"'\s+",u"‘",s)
+        s = re.sub(u"\s+,",u"‚",s)
     else:
         # straight double quotes
-        s = re.sub(ur"\s+''",u"“",s)
-        s = re.sub(ur"''\s+",u"”",s)
-        s = re.sub(ur"\s+,,",u"„",s)
+        s = re.sub(u"\s+''",u"“",s)
+        s = re.sub(u"''\s+",u"”",s)
+        s = re.sub(u"\s+,,",u"„",s)
         # straight single quotes
-        s = re.sub(ur"\s+'",u"‘",s)
-        s = re.sub(ur"'\s+",u"’",s)
-        s = re.sub(ur"\s+,",u"‚",s)
+        s = re.sub(u"\s+'",u"‘",s)
+        s = re.sub(u"'\s+",u"’",s)
+        s = re.sub(u"\s+,",u"‚",s)
     return s

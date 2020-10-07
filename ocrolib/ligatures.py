@@ -6,6 +6,11 @@
 
 import re
 from pylab import uint32
+import unicodedata
+import sys
+if sys.version_info[0] >= 3:
+    unicode = str
+    unichr = chr
 
 ### These aren't formal ligatures, they are character pairs
 ### that are frequently touching in Latin script documents.
@@ -54,7 +59,7 @@ class LigatureTable:
         for c in common_chars:
             self.add(c,ord(c))
     def add(self,name,code,override=1):
-        assert type(name)==unicode or not re.search(r'[\x80-\xff]',name)
+        #assert type(name)==unicode or not re.search(r"[\x80-\xff]",name)
         if not override and self.lig2code.get(name) is not None:
             raise Exception("character '%s' (%d) already in ligature table"%(name,self.ord(name)))
         self.lig2code[name] = code
